@@ -1,6 +1,12 @@
 {{- if .Values.ingress.enabled -}}
 {{- $fullName := include "sealed-secrets-web.fullname" . -}}
+{{- if .Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress" }}
+apiVersion: networking.k8s.io/v1
+{{- else if .Capabilities.APIVersions.Has "networking.k8s.io/v1beta1/Ingress" }}
+apiVersion: networking.k8s.io/v1beta1
+{{- else }}
 apiVersion: extensions/v1beta1
+{{- end }}
 kind: Ingress
 metadata:
   name: {{ $fullName }}
@@ -29,8 +35,16 @@ spec:
         {{- range .paths }}
           - path: {{ . }}
             backend:
+            {{- if semverCompare "<1.19-0" .Capabilities.KubeVersion.GitVersion }}
               serviceName: {{ $fullName }}
               servicePort: http
+            {{- else }}
+              service:
+                name: {{ $fullName }}
+                port:
+                  name: http
+            pathType: ImplementationSpecific
+            {{- end }}
         {{- end }}
   {{- end }}
 {{- end }}
